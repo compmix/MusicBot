@@ -10,6 +10,8 @@ import asyncio
 import traceback
 import random
 
+from musicbot.geniuslyrics import GeniusLyrics
+
 from discord import utils
 from discord.object import Object
 from discord.enums import ChannelType
@@ -75,6 +77,9 @@ class MusicBot(discord.Client):
 
         self.config = Config(config_file)
         self.permissions = Permissions(perms_file, grant_all=[self.config.owner_id])
+
+        f = open('config/token.ini', 'r+')
+        self.client_access_token = f.readline()
 
         self.blacklist = set(load_file(self.config.blacklist_file))
         self.autoplaylist = load_file(self.config.auto_playlist_file)
@@ -1732,6 +1737,7 @@ class MusicBot(discord.Client):
         await self.send_message(author, '\n'.join(lines))
         return Response(":mailbox_with_mail:", delete_after=20)
 
+
     async def cmd_roll(self, dice):
         """
         Usage:
@@ -1770,6 +1776,33 @@ class MusicBot(discord.Client):
             raise exceptions.CommandError("Please check the format!", expire_in=30)
 
         return Response("rolling {} d{} {:+}... ```{}```".format(amount, size, modifier, result), reply=True, delete_after=35)
+
+
+    async def cmd_lyrics(self, leftover_args):
+        """
+        Usage:
+            lyrics [songname]
+
+        Looks up song lyrics via Genius.com
+        """
+
+        query = ' '.join([*leftover_args])
+        print(query)
+
+        try:
+            genius = GeniusLyrics(self.client_access_token)
+        except:
+            raise exceptions.CommandError("Couldn't initialize!", expire_in=30)
+
+        try:
+            lyrics = genius.search(query)
+        except:
+            raise exceptions.CommandError("Couldn't get lyrics!", expire_in=30)
+
+        lyrics = lyrics[:2000]
+
+        return Response('%s' % (lyrics), reply=False, delete_after=20)
+
 
 
     @owner_only
