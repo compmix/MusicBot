@@ -8,6 +8,7 @@ import aiohttp
 import discord
 import asyncio
 import traceback
+import random
 
 from discord import utils
 from discord.object import Object
@@ -1730,6 +1731,45 @@ class MusicBot(discord.Client):
 
         await self.send_message(author, '\n'.join(lines))
         return Response(":mailbox_with_mail:", delete_after=20)
+
+    async def cmd_roll(self, dice):
+        """
+        Usage:
+            {command_prefix}roll [x]d[y]+[z]
+
+        Rolls x dice of size y and adds z.
+        """
+
+        if "+" in dice or "-" in dice:
+            try:
+                modifier = result = int(dice.lstrip('1234567890d'))
+            except ValueError:
+                raise exceptions.CommandError("Please check the format!", expire_in=30)
+        else:
+            modifier = result = 0
+
+        dice = dice.split("+", 1)[0]
+        dice = dice.split("-", 1)[0]
+
+        try:
+            size = int(dice.split("d", 1)[1])
+        except:
+            raise exceptions.CommandError("Please check the format!", expire_in=30)
+
+        try:
+            amount = int(dice.split("d", 1)[0])
+            if amount > 10000:
+                raise exceptions.CommandError("Roll limit exceeded (>10000).", expire_in=30)
+        except ValueError:
+            amount = 1
+
+        try:
+            for i in range(0, amount):
+                result += random.randint(1,size)
+        except:
+            raise exceptions.CommandError("Please check the format!", expire_in=30)
+
+        return Response("rolling {} d{} {:+}... ```{}```".format(amount, size, modifier, result), reply=True, delete_after=35)
 
 
     @owner_only
