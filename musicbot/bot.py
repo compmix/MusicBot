@@ -1778,30 +1778,43 @@ class MusicBot(discord.Client):
         return Response("rolling {} d{} {:+}... ```{}```".format(amount, size, modifier, result), reply=True, delete_after=35)
 
 
-    async def cmd_lyrics(self, leftover_args):
+    async def cmd_lyrics(self, channel, leftover_args):
         """
         Usage:
-            lyrics [songname]
+            {command prefix}lyrics [songname]
 
         Looks up song lyrics via Genius.com
         """
 
         query = ' '.join([*leftover_args])
-        print(query)
 
         try:
             genius = GeniusLyrics(self.client_access_token)
         except:
-            raise exceptions.CommandError("Couldn't initialize!", expire_in=30)
+            raise exceptions.CommandError("Couldn't initialize! Missing token?", expire_in=30)
 
         try:
             lyrics = genius.search(query)
         except:
-            raise exceptions.CommandError("Couldn't get lyrics!", expire_in=30)
+            raise exceptions.CommandError("Couldn't get lyrics! Wrong Token?", expire_in=30)
 
-        lyrics = lyrics[:2000]
+        for i in range(0, len(lyrics), 2000):
+                chunk = lyrics[i:i+2000]
+                await self.safe_send_message(channel, chunk)
 
-        return Response('%s' % (lyrics), reply=False, delete_after=20)
+        return
+
+
+    async def cmd_lplay(self, message, leftover_args):
+        song_query = ' '.join([*leftover_args])
+        
+        message.content = "play " + song_query
+        await self.on_message(message)
+
+        message.content = "lyrics " + song_query
+        await self.on_message(message)
+
+
 
 
 
