@@ -1748,11 +1748,14 @@ class MusicBot(discord.Client):
 
         if "+" in dice or "-" in dice:
             try:
-                modifier = result = int(dice.lstrip('1234567890d'))
+                modifier = int(dice.lstrip('1234567890d'))
             except ValueError:
                 raise exceptions.CommandError("Please check the format!", expire_in=30)
         else:
-            modifier = result = 0
+            modifier = 0
+
+        result = ""
+        total = 0
 
         dice = dice.split("+", 1)[0]
         dice = dice.split("-", 1)[0]
@@ -1771,14 +1774,19 @@ class MusicBot(discord.Client):
 
         try:
             for i in range(0, amount):
-                result += random.randint(1,size)
+                roll = random.randint(1,size)
+                result += str(roll) + " + " 
+                total += roll
+            result += str(modifier)
+            total += modifier
+
         except:
             raise exceptions.CommandError("Please check the format!", expire_in=30)
 
-        return Response("rolling {} d{} {:+}... ```{}```".format(amount, size, modifier, result), reply=True, delete_after=35)
+        return Response("rolling {}d{}{:+}... ```{} = {}```".format(amount, size, modifier, result, total), reply=True, delete_after=35)
 
 
-    async def cmd_lyrics(self, channel, leftover_args):
+    async def cmd_lyrics(self, channel, player, leftover_args):
         """
         Usage:
             {command prefix}lyrics [songname]
@@ -1786,7 +1794,11 @@ class MusicBot(discord.Client):
         Looks up song lyrics via Genius.com
         """
 
-        query = ' '.join([*leftover_args])
+
+        if leftover_args:
+            query =  player.current_entry.title
+        else:
+            query = ' '.join([*leftover_args])
 
         try:
             genius = GeniusLyrics(self.client_access_token)
@@ -1798,9 +1810,18 @@ class MusicBot(discord.Client):
         except:
             raise exceptions.CommandError("Couldn't get lyrics! Wrong Token?", expire_in=30)
 
+        if len(lyrics) > 6000:
+            raise exceptions.CommandError("Lyrics too long, couldn't display!", expire_in=20)
+
+
         for i in range(0, len(lyrics), 2000):
                 chunk = lyrics[i:i+2000]
                 await self.safe_send_message(channel, chunk)
+
+        #lines = lyrics.splitlines(True)
+        #for i in range(0, len(lines), 50):
+        #    chunk = ''.join(lines[i:i+50])
+        #    await self.safe_send_message(channel, chunk)
 
         return
 
