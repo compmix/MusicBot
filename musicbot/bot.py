@@ -8,6 +8,9 @@ import aiohttp
 import discord
 import asyncio
 import traceback
+import random
+
+from musicbot.geniuslyrics import GeniusLyrics
 
 from discord import utils
 from discord.object import Object
@@ -74,6 +77,9 @@ class MusicBot(discord.Client):
 
         self.config = Config(config_file)
         self.permissions = Permissions(perms_file, grant_all=[self.config.owner_id])
+
+        f = open('config/token.ini', 'r+')
+        self.client_access_token = f.readline()
 
         self.blacklist = set(load_file(self.config.blacklist_file))
         self.autoplaylist = load_file(self.config.auto_playlist_file)
@@ -1730,6 +1736,107 @@ class MusicBot(discord.Client):
 
         await self.send_message(author, '\n'.join(lines))
         return Response(":mailbox_with_mail:", delete_after=20)
+
+
+    async def cmd_roll(self, dice):
+        """
+        Usage:
+            {command_prefix}roll [x]d[y]+[z]
+
+        Rolls x dice of size y and adds z.
+        """
+
+        if "+" in dice or "-" in dice:
+            try:
+                modifier = int(dice.lstrip('1234567890d'))
+            except ValueError:
+                raise exceptions.CommandError("Please check the format!", expire_in=30)
+        else:
+            modifier = 0
+
+        result = ""
+        total = 0
+
+        dice = dice.split("+", 1)[0]
+        dice = dice.split("-", 1)[0]
+
+        try:
+            size = int(dice.split("d", 1)[1])
+        except:
+            raise exceptions.CommandError("Please check the format!", expire_in=30)
+
+        try:
+            amount = int(dice.split("d", 1)[0])
+            if amount > 10000:
+                raise exceptions.CommandError("Roll limit exceeded (>10000).", expire_in=30)
+        except ValueError:
+            amount = 1
+
+        try:
+            for i in range(0, amount):
+                roll = random.randint(1,size)
+                result += str(roll) + " + " 
+                total += roll
+            result += str(modifier)
+            total += modifier
+
+        except:
+            raise exceptions.CommandError("Please check the format!", expire_in=30)
+
+        return Response("rolling {}d{}{:+}... ```{} = {}```".format(amount, size, modifier, result, total), reply=True, delete_after=35)
+
+
+    async def cmd_lyrics(self, channel, player, leftover_args):
+        """
+        Usage:
+            {command prefix}lyrics [songname]
+
+        Looks up song lyrics via Genius.com
+        """
+
+
+        if leftover_args:
+            query =  player.current_entry.title
+        else:
+            query = ' '.join([*leftover_args])
+
+        try:
+            genius = GeniusLyrics(self.client_access_token)
+        except:
+            raise exceptions.CommandError("Couldn't initialize! Missing token?", expire_in=30)
+
+        try:
+            lyrics = genius.search(query)
+        except:
+            raise exceptions.CommandError("Couldn't get lyrics! Wrong Token?", expire_in=30)
+
+        if len(lyrics) > 6000:
+            raise exceptions.CommandError("Lyrics too long, couldn't display!", expire_in=20)
+
+
+        for i in range(0, len(lyrics), 2000):
+                chunk = lyrics[i:i+2000]
+                await self.safe_send_message(channel, chunk)
+
+        #lines = lyrics.splitlines(True)
+        #for i in range(0, len(lines), 50):
+        #    chunk = ''.join(lines[i:i+50])
+        #    await self.safe_send_message(channel, chunk)
+
+        return
+
+
+    async def cmd_lplay(self, message, leftover_args):
+        song_query = ' '.join([*leftover_args])
+        
+        message.content = "play " + song_query
+        await self.on_message(message)
+
+        message.content = "lyrics " + song_query
+        await self.on_message(message)
+
+
+
 
 
     @owner_only

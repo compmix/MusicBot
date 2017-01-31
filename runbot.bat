@@ -21,7 +21,7 @@ ENDLOCAL
 
 
 IF EXIST %SYSTEMROOT%\py.exe (
-    CMD /k py.exe -3.5 run.py
+    CMD /c py.exe -3.5 run.py
     EXIT
 )
 
