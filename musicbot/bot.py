@@ -1794,11 +1794,11 @@ class MusicBot(discord.Client):
         Looks up song lyrics via Genius.com
         """
 
-
+        # Search for current song if [songname] doesn't exist
         if leftover_args:
-            query =  player.current_entry.title
-        else:
             query = ' '.join([*leftover_args])
+        else:
+            query = player.current_entry.title
 
         try:
             genius = GeniusLyrics(self.client_access_token)
