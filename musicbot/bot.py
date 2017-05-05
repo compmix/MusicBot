@@ -1795,6 +1795,10 @@ class MusicBot(discord.Client):
         """
 
         # Search for current song if [songname] doesn't exist
+        print(channel)
+        print(player)
+        print(leftover_args)
+
         if leftover_args:
             query = ' '.join([*leftover_args])
         else:
@@ -1810,18 +1814,24 @@ class MusicBot(discord.Client):
         except:
             raise exceptions.CommandError("Couldn't get lyrics! Wrong Token?", expire_in=30)
 
-        if len(lyrics) > 6000:
+        if len(lyrics) > 10000:
             raise exceptions.CommandError("Lyrics too long, couldn't display!", expire_in=20)
 
 
-        for i in range(0, len(lyrics), 2000):
-                chunk = lyrics[i:i+2000]
-                await self.safe_send_message(channel, chunk)
+        # seperate lyrics into maxlength 2000 char chunks
+        chunk = "Lyrics results for **" + " ".join(leftover_args) + "** \n"
+        while lyrics:
+            chunk += "\n"
+            l = lyrics.partition('\n')
+            chunk += l[0]
 
-        #lines = lyrics.splitlines(True)
-        #for i in range(0, len(lines), 50):
-        #    chunk = ''.join(lines[i:i+50])
-        #    await self.safe_send_message(channel, chunk)
+            # if past the 2000 char limit, remove the previous line and send to chat
+            if(len(chunk) > 2000):
+                chunk = chunk.rpartition('\n')[0]
+                await self.safe_send_message(channel, chunk)
+                chunk = "."
+            else:
+                lyrics = l[2]
 
         return
 
