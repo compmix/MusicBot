@@ -1833,6 +1833,8 @@ class MusicBot(discord.Client):
             else:
                 lyrics = l[2]
 
+        await self.safe_send_message(channel, chunk)
+
         return
 
 
