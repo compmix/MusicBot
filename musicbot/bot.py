@@ -387,6 +387,7 @@ class MusicBot(discord.Client):
 
         channel = entry.meta.get('channel', None)
         author = entry.meta.get('author', None)
+        lyrics = entry.meta.get('lyrics', None)
 
         if channel and author:
             last_np_msg = self.server_specific_data[channel.server]['last_np_msg']
@@ -409,6 +410,10 @@ class MusicBot(discord.Client):
                 self.server_specific_data[channel.server]['last_np_msg'] = await self.safe_edit_message(last_np_msg, newmsg, send_if_fail=True)
             else:
                 self.server_specific_data[channel.server]['last_np_msg'] = await self.safe_send_message(channel, newmsg)
+
+        if lyrics:
+            await self.cmd_lyrics(channel, player, leftover_args=None)
+
 
     async def on_player_resume(self, entry, **_):
         await self.update_now_playing(entry)
@@ -848,7 +853,7 @@ class MusicBot(discord.Client):
         except:
             raise exceptions.CommandError('Invalid URL provided:\n{}\n'.format(server_link), expire_in=30)
 
-    async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url):
+    async def cmd_play(self, player, channel, author, permissions, leftover_args, song_url, lyrics=False):
         """
         Usage:
             {command_prefix}play song_link
@@ -1009,7 +1014,7 @@ class MusicBot(discord.Client):
                 )
 
             try:
-                entry, position = await player.playlist.add_entry(song_url, channel=channel, author=author)
+                entry, position = await player.playlist.add_entry(song_url, channel=channel, author=author, lyrics=lyrics)
 
             except exceptions.WrongEntryTypeError as e:
                 if e.use_url == song_url:
@@ -1038,7 +1043,7 @@ class MusicBot(discord.Client):
 
             reply_text %= (btext, position, time_until)
 
-        return Response(reply_text, delete_after=30)
+        return Response(reply_text, delete_after=0)
 
     async def _cmd_play_playlist_async(self, player, channel, author, permissions, playlist_url, extractor_type):
         """
@@ -1555,7 +1560,7 @@ class MusicBot(discord.Client):
                 'There are no songs queued! Queue something with {}play.'.format(self.config.command_prefix))
 
         message = '\n'.join(lines)
-        return Response(message, delete_after=30)
+        return Response(message, delete_after=0)
 
     async def cmd_clean(self, message, channel, server, author, search_range=50):
         """
@@ -1795,31 +1800,36 @@ class MusicBot(discord.Client):
         """
 
         # Search for current song if [songname] doesn't exist
-        print(channel)
-        print(player)
-        print(leftover_args)
 
         if leftover_args:
             query = ' '.join([*leftover_args])
         else:
-            query = player.current_entry.title
-
+            query = player.current_entry.title.partition('(')[0] #removes any weird things from song titles, like (official video) which messes with search results
+            
         try:
             genius = GeniusLyrics(self.client_access_token)
         except:
             raise exceptions.CommandError("Couldn't initialize! Missing token?", expire_in=30)
 
         try:
-            lyrics = genius.search(query)
+            song_url = genius.search(query)
+            await self.safe_send_message(channel, "Lyrics from " + song_url, expire_in=0)
         except:
-            raise exceptions.CommandError("Couldn't get lyrics! Wrong Token?", expire_in=30)
+            await self.safe_send_message(channel, "Lyrics results for **" + query + "**", expire_in=30)
+            raise exceptions.CommandError("Couldn't find a matching song! Bad query or Wrong Token.", expire_in=30)
+
+        try:
+            lyrics = genius.scrape(song_url)
+        except:
+            raise exceptions.CommandError("Couldn't scrape lyrics", expire_in=30)
 
         if len(lyrics) > 10000:
-            raise exceptions.CommandError("Lyrics too long, couldn't display!", expire_in=20)
+            raise exceptions.CommandError("Lyrics too long (" + str(len(lyrics)) + "), couldn't display!", expire_in=20)
+
 
 
         # seperate lyrics into maxlength 2000 char chunks
-        chunk = "Lyrics results for **" + " ".join(leftover_args) + "** \n"
+        chunk = "."
         while lyrics:
             chunk += "\n"
             l = lyrics.partition('\n')
@@ -1828,26 +1838,28 @@ class MusicBot(discord.Client):
             # if past the 2000 char limit, remove the previous line and send to chat
             if(len(chunk) > 2000):
                 chunk = chunk.rpartition('\n')[0]
-                await self.safe_send_message(channel, chunk)
+                await self.safe_send_message(channel, chunk, expire_in=600)
                 chunk = "."
             else:
                 lyrics = l[2]
 
-        await self.safe_send_message(channel, chunk)
+        await self.safe_send_message(channel, chunk, expire_in=600)
 
         return
 
+    # shows lyrics when song plays
+    async def cmd_lplay(self, message, player, channel, author, permissions, leftover_args, song_url):
+        """
+        Usage:
+            {command_prefix}lplay song_link
+            {command_prefix}lplay text to search for
 
-    async def cmd_lplay(self, message, leftover_args):
-        song_query = ' '.join([*leftover_args])
-        
-        message.content = "play " + song_query
-        await self.on_message(message)
+        Adds the song to the playlist.  If a link is not provided, the first
+        result from a youtube search is added to the queue.
 
-        message.content = "lyrics " + song_query
-        await self.on_message(message)
-
-
+        Displays lyrics when the song plays.
+        """
+        return await self.cmd_play(player, channel, author, permissions, leftover_args, song_url, lyrics=True)
 
 
 
